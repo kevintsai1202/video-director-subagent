@@ -9,81 +9,130 @@
 <meta property="og:description" content="三步設定 Claude Code 的影片導演與錄影操作 subagent，附可直接複製的 agent 檔。">
 <meta property="og:image" content="https://kevintsai1202.github.io/video-director-subagent/assets/hero.jpg">
 <style>
-  /* 色彩 token：亮色為預設，深色跟隨系統 */
+  /* 色彩 token：取自 hero 圖的深藍夜景、電光藍與暖橘點光，整站固定為深色電影風 */
   :root {
-    --bg: #f7f7f5; --card: #ffffff; --text: #1f2328; --muted: #5d6670;
-    --line: #dfe2e6; --accent: #2457d6; --code-bg: #0f172a; --code-text: #e6edf3;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0e1116; --card: #161b22; --text: #e6edf3; --muted: #9aa5b1;
-      --line: #2a313a; --accent: #6ea0ff; --code-bg: #0a0d12; --code-text: #e6edf3;
-    }
+    --bg: #0a1126; --bg2: #0e1a38; --card: rgba(22, 36, 74, .55); --card-solid: #121d3d;
+    --text: #e8eefc; --muted: #9db0d3; --line: rgba(110, 160, 255, .18);
+    --accent: #6ea0ff; --accent-strong: #2457d6; --warm: #ffa94d;
+    --code-bg: #070c1b; --code-text: #dbe6ff;
   }
   * { box-sizing: border-box; }
+  html { color-scheme: dark; }
   body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font: 16px/1.7 -apple-system, "Segoe UI", "Microsoft JhengHei", "PingFang TC", sans-serif;
+    margin: 0; color: var(--text);
+    background:
+      radial-gradient(900px 500px at 12% -5%, rgba(36, 87, 214, .28), transparent 60%),
+      radial-gradient(700px 420px at 95% 8%, rgba(255, 169, 77, .10), transparent 60%),
+      linear-gradient(180deg, var(--bg2), var(--bg) 480px), var(--bg);
+    background-attachment: fixed;
+    font: 16px/1.75 -apple-system, "Segoe UI", "Microsoft JhengHei", "PingFang TC", sans-serif;
   }
-  .wrap { max-width: 820px; margin: 0 auto; padding: 48px 16px 80px; }
-  /* hero 圖：滿版寬度、圓角，保持 16:9 比例 */
-  .hero { display: block; width: 100%; height: auto; border-radius: 14px; margin: 0 0 28px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
-  h1 { font-size: 1.9rem; margin: 0 0 8px; line-height: 1.3; }
-  h2 { font-size: 1.3rem; margin: 48px 0 12px; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 28px 16px 90px; }
+
+  /* hero：圖片四周以遮罩淡出，融入背景；光暈加強電影感 */
+  .hero-box { position: relative; margin: 0 -8px 8px; }
+  .hero-box::before {
+    content: ""; position: absolute; inset: 8% 10% 0; z-index: 0;
+    background: radial-gradient(closest-side, rgba(36, 87, 214, .45), transparent);
+    filter: blur(40px);
+  }
+  .hero {
+    position: relative; z-index: 1; display: block; width: 100%; height: auto; border-radius: 18px;
+    -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 100%);
+            mask-image: linear-gradient(180deg, #000 78%, transparent 100%);
+  }
+  .title-block { position: relative; z-index: 2; margin-top: -56px; text-align: center; }
+  .eyebrow {
+    display: inline-block; font-size: .8rem; letter-spacing: .14em; color: var(--warm);
+    border: 1px solid rgba(255, 169, 77, .4); border-radius: 999px; padding: 3px 14px; margin-bottom: 14px;
+    background: rgba(255, 169, 77, .08);
+  }
+  h1 {
+    font-size: 2.3rem; margin: 0 0 10px; line-height: 1.25; letter-spacing: .02em;
+    background: linear-gradient(90deg, #ffffff, var(--accent) 70%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .lead { color: var(--muted); font-size: 1.05rem; max-width: 640px; margin: 0 auto; }
+
+  h2 { font-size: 1.3rem; margin: 56px 0 16px; display: flex; align-items: center; gap: 10px; }
+  h2::before { content: ""; width: 5px; height: 1.1em; border-radius: 3px; background: linear-gradient(var(--accent), var(--warm)); }
   h3 { font-size: 1.05rem; margin: 0 0 8px; }
   p { margin: 8px 0; }
-  .lead { color: var(--muted); font-size: 1.05rem; }
-  .roles { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; margin: 24px 0 0; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
-  .card code { font-size: .85em; }
-  .steps { list-style: none; counter-reset: s; padding: 0; margin: 0; }
-  .steps > li { counter-increment: s; position: relative; padding: 0 0 20px 44px; }
-  .steps > li::before {
-    content: counter(s); position: absolute; left: 0; top: 0; width: 30px; height: 30px;
-    border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700;
-    display: grid; place-items: center; font-size: .9rem;
+
+  .roles { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; margin: 36px 0 0; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px;
+    backdrop-filter: blur(8px); box-shadow: 0 8px 30px rgba(3, 8, 24, .35);
   }
-  code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--line); padding: 1px 6px; border-radius: 4px; font-size: .9em; }
+  .card.director { border-top: 2px solid var(--accent); }
+  .card.recorder { border-top: 2px solid var(--warm); }
+  .card h3 span { color: var(--muted); font-weight: 400; font-size: .9rem; margin-left: 6px; }
+
+  .steps { list-style: none; counter-reset: s; padding: 0; margin: 0; position: relative; }
+  .steps > li { counter-increment: s; position: relative; padding: 0 0 22px 52px; }
+  .steps > li::after { content: ""; position: absolute; left: 17px; top: 38px; bottom: 4px; width: 2px; background: linear-gradient(var(--accent), transparent); opacity: .4; }
+  .steps > li:last-child::after { display: none; }
+  .steps > li::before {
+    content: counter(s); position: absolute; left: 0; top: 0; width: 36px; height: 36px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, var(--accent), var(--accent-strong));
+    color: #fff; font-weight: 700; display: grid; place-items: center;
+    box-shadow: 0 0 18px rgba(110, 160, 255, .55);
+  }
+
+  code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; background: rgba(110, 160, 255, .14); color: #c9dbff; padding: 1px 7px; border-radius: 5px; font-size: .88em; }
   .code { position: relative; margin: 12px 0; }
   .code pre {
-    margin: 0; background: var(--code-bg); color: var(--code-text); border-radius: 10px;
-    padding: 16px; overflow-x: auto; font-size: .85rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+    margin: 0; background: var(--code-bg); color: var(--code-text); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 16px; overflow-x: auto; font-size: .85rem; line-height: 1.65; white-space: pre-wrap; word-break: break-word;
+    box-shadow: inset 0 0 40px rgba(36, 87, 214, .08);
   }
-  .code pre code { background: none; padding: 0; font-size: inherit; }
+  .code pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
   .copy {
-    position: absolute; top: 8px; right: 8px; border: 1px solid #3b4654; background: #1c2430; color: #e6edf3;
-    border-radius: 6px; padding: 4px 10px; font-size: .8rem; cursor: pointer;
+    position: absolute; top: 10px; right: 10px; border: 1px solid var(--line); background: rgba(110, 160, 255, .12); color: var(--text);
+    border-radius: 8px; padding: 4px 12px; font-size: .8rem; cursor: pointer; transition: background .2s, border-color .2s;
   }
-  .copy:hover { background: #26303e; }
-  .tabs { display: flex; gap: 8px; margin: 16px 0 0; }
-  .tab { border: 1px solid var(--line); background: var(--card); color: var(--text); padding: 8px 14px; border-radius: 8px 8px 0 0; cursor: pointer; font: inherit; }
-  .tab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .copy:hover { background: rgba(110, 160, 255, .28); border-color: var(--accent); }
+
+  .tabs { display: flex; gap: 8px; margin: 8px 0 12px; flex-wrap: wrap; }
+  .tab {
+    border: 1px solid var(--line); background: var(--card); color: var(--muted); padding: 8px 18px; border-radius: 999px;
+    cursor: pointer; font: inherit; font-size: .9rem; transition: all .2s;
+  }
+  .tab:hover { color: var(--text); border-color: var(--accent); }
+  .tab[aria-selected="true"] { background: linear-gradient(135deg, var(--accent-strong), #3d7bff); border-color: transparent; color: #fff; box-shadow: 0 0 18px rgba(61, 123, 255, .5); }
   .panel[hidden] { display: none; }
-  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { background: var(--bg); font-weight: 600; width: 22%; }
+
+  table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: rgba(110, 160, 255, .07); font-weight: 600; width: 22%; }
   tr:last-child td, tr:last-child th { border-bottom: 0; }
-  .note { border-left: 4px solid var(--accent); background: var(--card); padding: 10px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; }
-  footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
-  @media (max-width: 640px) { .roles { grid-template-columns: 1fr; } h1 { font-size: 1.5rem; } th { width: 30%; } }
+  .note { border: 1px solid rgba(255, 169, 77, .35); background: rgba(255, 169, 77, .07); padding: 6px 18px; border-radius: 12px; margin: 16px 0; }
+  footer { margin-top: 64px; color: var(--muted); font-size: .88rem; text-align: center; }
+  @media (max-width: 640px) {
+    .roles { grid-template-columns: 1fr; } h1 { font-size: 1.65rem; } th { width: 32%; }
+    .title-block { margin-top: -28px; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
 
-<img class="hero" src="assets/hero.jpg" width="1672" height="941" alt="電影場記板居中，左側導演椅與分鏡卡，右側瀏覽器視窗與攝影機鏡頭，下方是剪輯時間軸，以發光線條連接，象徵導演與錄影操作兩個代理協作">
+<div class="hero-box"><img class="hero" src="assets/hero.jpg" width="1672" height="941" alt="電影場記板居中，左側導演椅與分鏡卡，右側瀏覽器視窗與攝影機鏡頭，下方是剪輯時間軸，以發光線條連接，象徵導演與錄影操作兩個代理協作"></div>
 
+<div class="title-block">
+<span class="eyebrow">CLAUDE CODE · SUBAGENT</span>
 <h1>影片導演 subagent 設定</h1>
 <p class="lead">在 Claude Code 裡設兩個 subagent，主對話遇到做影片的需求，就自動交給導演；要操作網站或系統錄影，導演再派給操作代理。</p>
+</div>
 
 <div class="roles">
-  <div class="card">
-    <h3>video-director　導演</h3>
+  <div class="card director">
+    <h3>video-director<span>導演</span></h3>
     <p>分鏡、配音、合成、混音、渲染、驗收。</p>
     <p>建議模型：<code>claude-fable-5-2</code></p>
   </div>
-  <div class="card">
-    <h3>video-recorder　操作</h3>
+  <div class="card recorder">
+    <h3>video-recorder<span>操作</span></h3>
     <p>用 Playwright 操作網站或系統並錄影，記錄操作時間點。</p>
     <p>建議模型：<code>sonnet</code></p>
   </div>
